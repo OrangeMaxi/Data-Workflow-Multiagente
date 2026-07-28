@@ -1,0 +1,38 @@
+{
+  "TICKET-4812": {
+    "title": "Test Story",
+    "description": "Test Desc",
+    "status": "To Do",
+    "assignee": "QA"
+  },
+  "TICKET-0E3A": {
+    "title": "Test Story",
+    "description": "Test Desc",
+    "status": "To Do",
+    "assignee": "QA"
+  },
+  "TICKET-E940": {
+    "title": "Test Story",
+    "description": "Test Desc",
+    "status": "To Do",
+    "assignee": "QA"
+  },
+  "TICKET-891F": {
+    "title": "Test Story",
+    "description": "Test Desc",
+    "status": "To Do",
+    "assignee": "QA"
+  },
+  "TICKET-9640": {
+    "title": "Test Story",
+    "description": "Test Desc",
+    "status": "To Do",
+    "assignee": "QA"
+  },
+  "TICKET-D8BB": {
+    "title": "Crear Vista Analitica Gold Resumen Franquicias",
+    "description": "Requerimiento: Crear vista bakehouse.gold_resumen_franquicias con agregacion de ventas por franquicia.\nCriterios de Aceptacion:\n1. Agrupar por franchise_id.\n2. Calcular SUM(total_amount).\n3. Validar con QA y desplegar a Produccion.",
+    "status": "To Do",
+    "assignee": "Engineer"
+  }
+}

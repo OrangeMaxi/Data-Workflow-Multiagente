@@ -1,0 +1,22 @@
+# Google GenAI SDK y ADK
+google-genai>=0.3.0
+google-adk>=0.1.0
+python-dotenv>=1.0.0
+
+# Motores de procesamiento de datos analíticos
+pandas>=2.1.0
+duckdb>=0.9.0
+sqlalchemy>=2.0.0
+databricks-sql-connector>=3.0.0
+databricks-sdk>=0.20.0
+pyarrow>=14.0.0
+
+# Versionado de código y repositorios
+GitPython>=3.1.40
+
+# Testing e Integridad (para QA)
+pytest>=7.4.0
+great-expectations>=0.18.0
+
+# Otras utilidades (opcional para integraciones mock de Agile)
+requests>=2.31.0

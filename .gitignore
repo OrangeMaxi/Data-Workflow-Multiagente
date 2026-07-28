@@ -1,0 +1,42 @@
+# Entornos virtuales
+.venv/
+env/
+venv/
+ENV/
+
+# Entorno y credenciales sensibles
+.env
+*.pem
+
+# Archivos de caché de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Datos y base de datos local del ADK
+.adk/
+*.db
+*.sqlite3
+
+# Archivos de distribución y compilación
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDEs
+.vscode/
+.idea/
+.project
+.pydevproject
