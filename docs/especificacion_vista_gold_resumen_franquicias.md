@@ -5,4 +5,4 @@ Vista agregada para tableros ejecutivos.
 
 ## Definicion Tecnica
 Origen: `bakehouse.sales_transactions`
-Campos: `franchise_id`, `ventas_totales`, `total_transacciones`.
+Campos: `franchiseID`, `ventas_totales`, `total_transacciones`.

@@ -34,5 +34,11 @@
     "description": "Requerimiento: Crear vista bakehouse.gold_resumen_franquicias con agregacion de ventas por franquicia.\nCriterios de Aceptacion:\n1. Agrupar por franchise_id.\n2. Calcular SUM(total_amount).\n3. Validar con QA y desplegar a Produccion.",
     "status": "To Do",
     "assignee": "Engineer"
+  },
+  "TICKET-2BFA": {
+    "title": "Crear Vista Analitica Gold Resumen Franquicias",
+    "description": "Requerimiento: Crear vista bakehouse.gold_resumen_franquicias con agregacion de ventas por franquicia.\nCriterios de Aceptacion:\n1. Agrupar por franchiseID.\n2. Calcular SUM(total_amount).\n3. Validar con QA y desplegar a Produccion.",
+    "status": "To Do",
+    "assignee": "Engineer"
   }
 }
