@@ -13,6 +13,15 @@ load_dotenv()
 
 BOARD_FILE = settings.BOARD_FILE
 
+# Mapeo oficial de columnas del tablero Trello
+OFFICIAL_TRELLO_COLUMNS = {
+    "BACKLOG": "Backlog - To Do",
+    "SPRINT": "Current Sprint",
+    "IN_PROGRESS": "In Progress",
+    "QA": "QA",
+    "DONE": "Done"
+}
+
 def _load_local_board() -> dict:
     if os.path.exists(BOARD_FILE):
         try:
@@ -40,14 +49,14 @@ def _get_trello_lists(key: str, token: str, board_id: str) -> dict:
     try:
         res = requests.get(url, params=params, timeout=5)
         if res.status_code == 200:
-            return {l["name"].lower(): l["id"] for l in res.json()}
+            return {l["name"].strip().lower(): l["id"] for l in res.json()}
     except Exception as e:
         print(f"  [Trello Warning] Error al obtener listas del tablero: {e}")
     return {}
 
 def create_agile_ticket(title: str, description: str, assignee: str = None) -> str:
     """
-    Crea un ticket/tarjeta real en Trello (si hay credenciales) o en el Kanban local (.kanban_board.json).
+    Crea una tarjeta en la columna 'Backlog - To Do' del tablero Trello en vivo o Kanban local.
     
     Args:
         title: Título descriptivo de la historia de usuario o tarea.
@@ -63,8 +72,10 @@ def create_agile_ticket(title: str, description: str, assignee: str = None) -> s
         try:
             lists = _get_trello_lists(key, token, board_id)
             target_list_id = None
+            
+            # Buscar coincidencia exacta con 'backlog - to do' o variaciones
             for name, list_id in lists.items():
-                if any(kw in name for kw in ["to do", "todo", "pendiente", "backlog"]):
+                if "backlog" in name or "to do" in name or "pendiente" in name:
                     target_list_id = list_id
                     break
             if not target_list_id and lists:
@@ -83,7 +94,7 @@ def create_agile_ticket(title: str, description: str, assignee: str = None) -> s
                 if res.status_code == 200:
                     card_data = res.json()
                     log_audit_event("Analyst", "TRELLO_CARD_CREATE", card_data.get('id'), "SUCCESS")
-                    return f"Tarjeta creada exitosamente en Trello en vivo: {card_data.get('shortUrl')} (ID: {card_data.get('id')})"
+                    return f"Tarjeta creada en columna 'Backlog - To Do' de Trello en vivo: {card_data.get('shortUrl')} (ID: {card_data.get('id')})"
                 else:
                     log_audit_event("Analyst", "TRELLO_CARD_CREATE", title, "FAILED", {"status": res.status_code})
                     return f"Error al crear tarjeta en Trello ({res.status_code}): {res.text}"
@@ -96,23 +107,24 @@ def create_agile_ticket(title: str, description: str, assignee: str = None) -> s
     board[ticket_id] = {
         "title": title,
         "description": description,
-        "status": "To Do",
+        "status": "Backlog - To Do",
         "assignee": assignee or "Unassigned"
     }
     _save_local_board(board)
     log_audit_event("Analyst", "LOCAL_TICKET_CREATE", ticket_id, "SUCCESS")
-    return f"Ticket {ticket_id} creado en el Kanban local (.kanban_board.json). Para sincronizar en Trello en vivo, configura TRELLO_API_KEY en .env."
+    return f"Ticket {ticket_id} creado en el Kanban local en 'Backlog - To Do'. Para sincronizar en Trello en vivo, configura TRELLO_API_KEY en .env."
 
 def update_ticket_status(ticket_id: str, new_status: str) -> str:
     """
-    Mueve la tarjeta en Trello a una nueva columna/lista según el nuevo estado, o actualiza el Kanban local y notifica si pasa a Done/QA Pass.
+    Mueve una tarjeta de Trello a una de las columnas oficiales:
+    ['Backlog - To Do', 'Current Sprint', 'In Progress', 'QA', 'Done']
     
     Args:
-        ticket_id: ID del ticket local o ID de la tarjeta en Trello.
-        new_status: Nuevo estado (ej. 'In Progress', 'QA Pass', 'Done').
+        ticket_id: ID del ticket local o ID de la tarjeta en Trello (ej. '6a691194bfd5cd6ab6d523ea')
+        new_status: Nombre del estado objetivo ('Backlog - To Do', 'Current Sprint', 'In Progress', 'QA', 'Done').
         
     Returns:
-        Confirmación del movimiento del ticket y despacho de alerta.
+        Confirmación del movimiento del ticket y despacho de alerta si corresponde.
     """
     key, token, board_id = _get_trello_creds()
     
@@ -120,12 +132,29 @@ def update_ticket_status(ticket_id: str, new_status: str) -> str:
         try:
             lists = _get_trello_lists(key, token, board_id)
             target_list_id = None
-            new_status_lower = new_status.lower()
+            new_status_lower = new_status.strip().lower()
             
-            for name, list_id in lists.items():
-                if new_status_lower in name or name in new_status_lower:
-                    target_list_id = list_id
-                    break
+            # 1. Búsqueda exacta de lista
+            if new_status_lower in lists:
+                target_list_id = lists[new_status_lower]
+            else:
+                # 2. Búsqueda por palabra clave en columnas oficiales
+                for name, list_id in lists.items():
+                    if new_status_lower in name or name in new_status_lower:
+                        target_list_id = list_id
+                        break
+                    if "qa" in new_status_lower and "qa" in name:
+                        target_list_id = list_id
+                        break
+                    if "progress" in new_status_lower and "progress" in name:
+                        target_list_id = list_id
+                        break
+                    if "sprint" in new_status_lower and "sprint" in name:
+                        target_list_id = list_id
+                        break
+                    if "done" in new_status_lower and "done" in name:
+                        target_list_id = list_id
+                        break
                     
             if target_list_id and len(ticket_id) > 10:
                 url = f"https://api.trello.com/1/cards/{ticket_id}"
@@ -134,14 +163,14 @@ def update_ticket_status(ticket_id: str, new_status: str) -> str:
                 if res.status_code == 200:
                     log_audit_event("AgileBoard", "TRELLO_CARD_UPDATE", ticket_id, "SUCCESS", {"new_status": new_status})
                     
-                    if any(kw in new_status.lower() for kw in ["done", "finalizado", "qa pass", "completado"]):
+                    if any(kw in new_status.lower() for kw in ["done", "qa", "completado"]):
                         send_alert_notification(
                             event_type="KANBAN_DONE",
-                            subject=f"✅ Tarea Movida a {new_status}: {ticket_id}",
-                            message=f"La tarjeta de Trello {ticket_id} ha sido completada y movida exitosamente al estado '{new_status}'.",
+                            subject=f"✅ Tarea Movida a '{new_status}': {ticket_id}",
+                            message=f"La tarjeta de Trello {ticket_id} ha sido trasladada exitosamente a la columna '{new_status}'.",
                             channels=["email"]
                         )
-                    return f"Tarjeta de Trello ({ticket_id}) movida exitosamente a la lista '{new_status}'. Alerta notificada."
+                    return f"Tarjeta de Trello ({ticket_id}) movida exitosamente a la columna '{new_status}'."
         except Exception as e:
             print(f"  [Trello Error] Falló actualización en Trello: {e}")
 
@@ -151,11 +180,11 @@ def update_ticket_status(ticket_id: str, new_status: str) -> str:
         _save_local_board(board)
         log_audit_event("AgileBoard", "LOCAL_TICKET_UPDATE", ticket_id, "SUCCESS", {"new_status": new_status})
         
-        if any(kw in new_status.lower() for kw in ["done", "finalizado", "qa pass", "completado"]):
+        if any(kw in new_status.lower() for kw in ["done", "qa", "completado"]):
             send_alert_notification(
                 event_type="KANBAN_DONE",
-                subject=f"✅ Tarea Local Movida a {new_status}: {ticket_id}",
-                message=f"El ticket local {ticket_id} ('{board[ticket_id].get('title')}') ha sido completado y movido a '{new_status}'.",
+                subject=f"✅ Tarea Local Movida a '{new_status}': {ticket_id}",
+                message=f"El ticket local {ticket_id} ('{board[ticket_id].get('title')}') ha sido movido a '{new_status}'.",
                 channels=["email"]
             )
         return f"Ticket local {ticket_id} actualizado a '{new_status}' en .kanban_board.json."

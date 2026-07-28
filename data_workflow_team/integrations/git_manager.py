@@ -1,7 +1,7 @@
 import os
 import subprocess
 import requests
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 from dotenv import load_dotenv
 
 from data_workflow_team.config.settings import settings
@@ -27,12 +27,56 @@ def _run_git_cmd(args: list) -> Tuple[Optional[str], Optional[str]]:
     except Exception as e:
         return None, str(e)
 
+def git_create_issue(title: str, body: str, labels: List[str] = None) -> str:
+    """
+    Crea un Issue real en el repositorio de GitHub mediante la API REST v3 para rastrear requerimientos.
+    
+    Args:
+        title: Título descriptivo del Issue en GitHub.
+        body: Descripción detallada y criterios de aceptación.
+        labels: Etiquetas asociadas (ej. ['enhancement', 'gold-layer']).
+        
+    Returns:
+        URL del Issue creado en GitHub o confirmación local.
+    """
+    token = settings.GITHUB_TOKEN
+    repo = settings.GITHUB_REPOSITORY
+    
+    if not token or not repo:
+        log_audit_event("Analyst", "GITHUB_ISSUE_CREATE", title, "FAILED", {"reason": "Missing creds"})
+        return f"Issue local registrado: '{title}'. Para crear en GitHub en vivo, configura GITHUB_TOKEN en .env."
+
+    url = f"https://api.github.com/repos/{repo}/issues"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    payload = {
+        "title": title,
+        "body": body,
+        "labels": labels or ["data-workflow"]
+    }
+    
+    try:
+        res = requests.post(url, json=payload, headers=headers, timeout=10)
+        if res.status_code == 201:
+            issue_data = res.json()
+            issue_url = issue_data.get('html_url')
+            issue_num = issue_data.get('number')
+            log_audit_event("Analyst", "GITHUB_ISSUE_CREATE", issue_url, "SUCCESS")
+            return f"Issue #{issue_num} creado exitosamente en GitHub: {issue_url}"
+        else:
+            log_audit_event("Analyst", "GITHUB_ISSUE_CREATE", title, "FAILED", {"status": res.status_code})
+            return f"Error al crear Issue en GitHub ({res.status_code}): {res.text}"
+    except Exception as e:
+        return f"Error en la API de GitHub: {str(e)}"
+
 def git_checkout_branch(branch_name: str) -> str:
     """
     Crea o conmuta a una rama real de Git en el repositorio local y notifica el evento.
     
     Args:
-        branch_name: Nombre de la rama Git (ej. 'feature/nueva-vista-sales')
+        branch_name: Nombre de la rama Git (ej. 'feature/issue-12-gold-resumen-franquicias')
         
     Returns:
         Resultado del comando git checkout y despacho de alerta.
@@ -47,7 +91,6 @@ def git_checkout_branch(branch_name: str) -> str:
         
     log_audit_event("Engineer", "GIT_CHECKOUT", branch_name, "SUCCESS")
     
-    # Notificación de creación de rama
     send_alert_notification(
         event_type="GIT_BRANCH",
         subject=f"🌿 Nueva Rama Git Creada: {branch_name}",
@@ -96,15 +139,16 @@ def git_push(branch_name: str) -> str:
     log_audit_event("Engineer", "GIT_PUSH", branch_name, "SUCCESS")
     return f"Rama '{branch_name}' enviada exitosamente a GitHub origin."
 
-def git_create_pull_request(title: str, body: str, head_branch: str, base_branch: str = "main") -> str:
+def git_create_pull_request(title: str, body: str, head_branch: str, base_branch: str = "main", issue_number: int = None) -> str:
     """
-    Crea un Pull Request real en GitHub y dispara alertas multicanal.
+    Crea un Pull Request real en GitHub vinculándolo opcionalmente a un Issue.
     
     Args:
         title: Título descriptivo del Pull Request.
         body: Descripción y resumen de cambios incluidos.
         head_branch: Rama de origen que contiene los desarrollos.
         base_branch: Rama de destino (ej. 'main').
+        issue_number: Número del Issue de GitHub a cerrar automáticamente (ej. 12).
         
     Returns:
         URL y detalles del Pull Request creado en GitHub con notificación.
@@ -112,12 +156,16 @@ def git_create_pull_request(title: str, body: str, head_branch: str, base_branch
     token = settings.GITHUB_TOKEN
     repo = settings.GITHUB_REPOSITORY
     
+    full_body = body
+    if issue_number:
+        full_body += f"\n\nCloses #{issue_number}"
+        
     if not token or not repo:
         log_audit_event("Engineer", "GITHUB_PR_CREATE", head_branch, "FAILED", {"reason": "Missing creds"})
         send_alert_notification(
             event_type="GIT_PR",
             subject=f"📦 Pull Request Preparado: {title}",
-            message=f"Pull Request local preparado de '{head_branch}' hacia '{base_branch}'.\n\nResumen de Cambios:\n{body}",
+            message=f"Pull Request local preparado de '{head_branch}' hacia '{base_branch}'.\n\nResumen de Cambios:\n{full_body}",
             channels=["email"]
         )
         return (
@@ -132,7 +180,7 @@ def git_create_pull_request(title: str, body: str, head_branch: str, base_branch
     }
     payload = {
         "title": title,
-        "body": body,
+        "body": full_body,
         "head": head_branch,
         "base": base_branch
     }
@@ -144,11 +192,10 @@ def git_create_pull_request(title: str, body: str, head_branch: str, base_branch
             pr_url = pr_data.get('html_url')
             log_audit_event("Engineer", "GITHUB_PR_CREATE", pr_url, "SUCCESS")
             
-            # Alerta de apertura de PR
             send_alert_notification(
                 event_type="GIT_PR",
                 subject=f"📦 Nuevo Pull Request Creado: {title}",
-                message=f"El agente Engineer ha creado un Pull Request en GitHub.\n\nURL: {pr_url}\nRama: '{head_branch}' -> '{base_branch}'\n\nResumen:\n{body}",
+                message=f"El agente Engineer ha creado un Pull Request en GitHub.\n\nURL: {pr_url}\nRama: '{head_branch}' -> '{base_branch}'\n\nResumen:\n{full_body}",
                 channels=["email"]
             )
             return f"Pull Request creado exitosamente en GitHub: {pr_url} (PR #{pr_data.get('number')}). Alerta enviada."
@@ -156,7 +203,7 @@ def git_create_pull_request(title: str, body: str, head_branch: str, base_branch
             log_audit_event("Engineer", "GITHUB_PR_CREATE", head_branch, "FAILED", {"status": res.status_code})
             return f"Error al crear Pull Request en GitHub ({res.status_code}): {res.text}"
     except Exception as e:
-        return f"Error en la solicitud HTTP a GitHub API: {str(e)}"
+        return f"Error en la API de GitHub: {str(e)}"
 
 def git_merge_pr(pr_number: int) -> str:
     """
@@ -193,7 +240,6 @@ def git_merge_pr(pr_number: int) -> str:
         if res.status_code == 200:
             log_audit_event("DataOps", "GITHUB_PR_MERGE", str(pr_number), "SUCCESS")
             
-            # Alerta de liberación a Producción
             send_alert_notification(
                 event_type="RELEASE",
                 subject=f"🚀 LIBERACIÓN A PRODUCCIÓN EXITO: PR #{pr_number} Fusionado",
