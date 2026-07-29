@@ -11,6 +11,7 @@ from data_workflow_team.core.audit_logger import log_audit_event, AUDIT_LOG_FILE
 from data_workflow_team.integrations.data_connectors import health_check_system, execute_read_only_query
 from data_workflow_team.integrations.agile_board import create_agile_ticket, update_ticket_status
 from data_workflow_team.integrations.notification_manager import send_alert_notification
+from data_workflow_team.integrations.git_manager import git_create_issue
 from data_workflow_team.agent import root_agent
 
 class TestEnterpriseSystem(unittest.TestCase):
@@ -41,7 +42,12 @@ class TestEnterpriseSystem(unittest.TestCase):
         res = send_alert_notification("TEST_EVENT", "Alerta de Prueba Unitarias", "Mensaje de prueba de integración", "maximilianonaranjo@gmail.com", ["email"])
         self.assertIn("Alerta 'TEST_EVENT' procesada exitosamente", res)
 
-    def test_06_agent_orchestrator_load(self):
+    def test_06_github_issue_creator(self):
+        """Verifica que la función de creación de GitHub Issues funcione o registre la auditoría."""
+        res = git_create_issue("Test GitHub Issue", "Descripción de prueba para el issue de desarrollo de datos.")
+        self.assertTrue("Issue #" in res or "Issue local registrado" in res)
+
+    def test_07_agent_orchestrator_load(self):
         """Verifica que el agente orquestador de Google ADK cargue los 6 subagentes."""
         self.assertEqual(root_agent.name, "Orchestrator")
         self.assertEqual(len(root_agent.sub_agents), 6)

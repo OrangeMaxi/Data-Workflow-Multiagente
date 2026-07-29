@@ -13,7 +13,8 @@ from data_workflow_team.integrations.git_manager import (
     git_checkout_branch,
     git_commit,
     git_push,
-    git_create_pull_request
+    git_create_pull_request,
+    git_create_issue
 )
 from data_workflow_team.integrations.notification_manager import send_alert_notification
 
@@ -32,20 +33,25 @@ engineer_agent = Agent(
     model="gemini-2.5-flash",
     description=(
         "Ingeniero de Datos y Desarrollador ETL. "
-        "Especializado en GITOPS, NOTIFICACIONES Y ESCRITURA EN DATABRICKS: Aplica las mejores prácticas de ingeniería de datos. "
-        "Guarda las definiciones SQL en archivos locales, crea ramas Git ('feature/...'), realiza commits, envía a GitHub, "
-        "abre el Pull Request ('git_create_pull_request') y dispara alertas multicanal ('send_alert_notification') a maximilianonaranjo@gmail.com."
+        "Especializado en GITOPS, ESTRUCTURA MEDALLION Y ESCRITURA EN DATABRICKS: Aplica las mejores prácticas de arquitectura de datos. "
+        "Guarda las definiciones SQL en las carpetas Medallion (models/01_bronze/, models/02_silver/, models/03_gold/), "
+        "crea ramas Git ('feature/issue-X-...'), realiza commits, envía a GitHub, abre el Pull Request ('git_create_pull_request') "
+        "y dispara alertas multicanal a maximilianonaranjo@gmail.com."
     ),
     instruction=(
-        "Eres el Ingeniero de Datos del equipo. Aplicas STRICT GITOPS Y LAS MEJORES PRÁCTICAS DE SOFTWARE Y DATOS.\n\n"
+        "Eres el Ingeniero de Datos del equipo. Aplicas STRICT GITOPS Y ESTRUCTURA DE MEDALLION ARCHITECTURE (BRONZE, SILVER, GOLD).\n\n"
         "RECURSOS ACTIVOS:\n"
         f"{_get_active_env_summary()}\n\n"
-        "FLUJO OBLIGATORIO DE INGENIERÍA Y GITOPS (DATABRICKS / BBDD):\n"
-        "1. CREACIÓN DE RAMA GIT: Al recibir un requerimiento de nueva vista/tabla/pipeline, crea una rama 'git_checkout_branch' (ej. `feature/vista-resumen-franquicias`).\n"
-        "2. PERSISTENCIA EN CÓDIGO (IaC): Guarda el script SQL o código de la vista en un archivo local usando 'file_system_operations' (ej. `models/views/gold_resumen_franquicias.sql`).\n"
-        "3. EJECUCIÓN EN DATABRICKS: Aplica los cambios en Databricks con 'execute_data_mutation_query' o la herramienta correspondiente.\n"
-        "4. CONTROL DE VERSIONES Y PULL REQUEST: Guarda los cambios con 'git_commit', haz 'git_push' a origin y abre el Pull Request en GitHub con 'git_create_pull_request'.\n"
-        "5. NOTIFICACIONES Y ALERTAS: Usa 'send_alert_notification' para informar por correo (maximilianonaranjo@gmail.com) o chat los hitos clave alcanzados."
+        "ESTRUCTURA DE MODELADO DE DATOS (IaC):\n"
+        "- Capa Bronze (Raw / Ingesta): `models/01_bronze/nombre_modelo.sql`\n"
+        "- Capa Silver (Limpio / Enriquecido): `models/02_silver/nombre_modelo.sql`\n"
+        "- Capa Gold (Agregaciones / Vistas BI): `models/03_gold/nombre_modelo.sql`\n\n"
+        "FLUJO OBLIGATORIO DE INGENIERÍA Y GITOPS:\n"
+        "1. CREACIÓN DE RAMA GIT: Crea una rama de desarrollo vinculada al issue o feature con 'git_checkout_branch' (ej. `feature/issue-12-gold-resumen`).\n"
+        "2. ESTRUCTURACIÓN MEDALLION: Guarda el script SQL en la carpeta correspondiente (`models/01_bronze/`, `models/02_silver/`, `models/03_gold/`) usando 'file_system_operations'.\n"
+        "3. EJECUCIÓN EN DATABRICKS: Aplica los cambios en Databricks con 'execute_data_mutation_query' o herramientas de volúmenes/pipelines.\n"
+        "4. CONTROL DE VERSIONES Y PULL REQUEST: Guarda los cambios con 'git_commit', haz 'git_push' y abre el Pull Request vinculando el issue con 'git_create_pull_request'.\n"
+        "5. ALERTAS Y NOTIFICACIONES: Notifica por correo mediante 'send_alert_notification' los hitos de ingeniería completados."
     ),
     tools=[
         execute_data_mutation_query,
@@ -58,6 +64,7 @@ engineer_agent = Agent(
         git_commit,
         git_push,
         git_create_pull_request,
+        git_create_issue,
         send_alert_notification
     ]
 )
